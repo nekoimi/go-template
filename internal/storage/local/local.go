@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/nekoimi/go-project-template/internal/config"
+	"github.com/nekoimi/go-project-template/internal/pkg/snowflake"
 	"github.com/nekoimi/go-project-template/internal/storage"
 )
 
@@ -28,17 +28,39 @@ func New(cfg config.StorageConfig) storage.FileStorage {
 	}
 }
 
+// safeJoin ensures the resulting path is within the upload directory.
+func (s *localStorage) safeJoin(elem ...string) (string, error) {
+	target := filepath.Join(elem...)
+	rel, err := filepath.Rel(s.uploadDir, target)
+	if err != nil {
+		return "", fmt.Errorf("invalid path")
+	}
+	if strings.HasPrefix(rel, "..") {
+		return "", fmt.Errorf("path traversal detected")
+	}
+	return target, nil
+}
+
 func (s *localStorage) Upload(_ context.Context, file *storage.FileHeader, folder string) (*storage.UploadResult, error) {
 	if file.Size > s.maxSize {
 		return nil, fmt.Errorf("file size %d exceeds max allowed %d", file.Size, s.maxSize)
 	}
 
-	// 生成唯一文件名
-	ext := filepath.Ext(file.Filename)
-	filename := uuid.New().String() + ext
+	// Sanitize folder: clean + reject traversal
+	folder = filepath.Clean(folder)
+	if strings.Contains(folder, "..") {
+		return nil, fmt.Errorf("invalid folder path")
+	}
 
-	// 目标目录
+	ext := filepath.Ext(file.Filename)
+	filename := snowflake.GenerateStringID() + ext
+
 	destDir := filepath.Join(s.uploadDir, folder)
+	destDir, err := s.safeJoin(s.uploadDir, folder)
+	if err != nil {
+		return nil, err
+	}
+
 	if err := os.MkdirAll(destDir, 0755); err != nil {
 		return nil, fmt.Errorf("failed to create upload dir: %w", err)
 	}
@@ -57,7 +79,6 @@ func (s *localStorage) Upload(_ context.Context, file *storage.FileHeader, folde
 	}
 
 	relPath := filepath.Join(folder, filename)
-	// 统一使用正斜杠
 	relPath = strings.ReplaceAll(relPath, "\\", "/")
 
 	mimeType := mime.TypeByExtension(ext)
@@ -71,7 +92,10 @@ func (s *localStorage) Upload(_ context.Context, file *storage.FileHeader, folde
 }
 
 func (s *localStorage) Delete(_ context.Context, path string) error {
-	fullPath := filepath.Join(s.uploadDir, path)
+	fullPath, err := s.safeJoin(s.uploadDir, path)
+	if err != nil {
+		return err
+	}
 	return os.Remove(fullPath)
 }
 
@@ -81,8 +105,11 @@ func (s *localStorage) GetURL(path string) string {
 }
 
 func (s *localStorage) Exists(_ context.Context, path string) (bool, error) {
-	fullPath := filepath.Join(s.uploadDir, path)
-	_, err := os.Stat(fullPath)
+	fullPath, err := s.safeJoin(s.uploadDir, path)
+	if err != nil {
+		return false, err
+	}
+	_, err = os.Stat(fullPath)
 	if os.IsNotExist(err) {
 		return false, nil
 	}

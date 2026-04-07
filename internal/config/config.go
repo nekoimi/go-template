@@ -6,14 +6,28 @@ type Config struct {
 	Server    ServerConfig    `mapstructure:"server"`
 	Database  DatabaseConfig  `mapstructure:"database"`
 	JWT       JWTConfig       `mapstructure:"jwt"`
+	Snowflake SnowflakeConfig `mapstructure:"snowflake"`
+	RateLimit RateLimitConfig `mapstructure:"rate_limit"`
 	Scheduler SchedulerConfig `mapstructure:"scheduler"`
 	Websocket WebsocketConfig `mapstructure:"websocket"`
 	Storage   StorageConfig   `mapstructure:"storage"`
 }
 
+type SnowflakeConfig struct {
+	NodeID int64 `mapstructure:"node_id"`
+}
+
+type RateLimitConfig struct {
+	Enabled bool    `mapstructure:"enabled"`
+	RPS     float64 `mapstructure:"rps"`
+	Burst   int     `mapstructure:"burst"`
+}
+
 type ServerConfig struct {
-	Port string `mapstructure:"port"`
-	Mode string `mapstructure:"mode"` // debug / release
+	Port            string `mapstructure:"port"`
+	Mode            string `mapstructure:"mode"` // debug / release
+	Timezone        string `mapstructure:"timezone"`
+	ShutdownTimeout int    `mapstructure:"shutdown_timeout"` // 秒
 }
 
 type DatabaseConfig struct {
@@ -56,8 +70,10 @@ type StorageConfig struct {
 }
 
 type LocalConfig struct {
-	UploadDir   string `mapstructure:"upload_dir"`
-	MaxFileSize int    `mapstructure:"max_file_size"` // MB
+	UploadDir    string   `mapstructure:"upload_dir"`
+	MaxFileSize  int      `mapstructure:"max_file_size"` // MB
+	AllowedExts  []string `mapstructure:"allowed_exts"`
+	AllowedMIMEs []string `mapstructure:"allowed_mimes"`
 }
 
 type MinioConfig struct {

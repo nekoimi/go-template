@@ -1,4 +1,4 @@
-.PHONY: run run-server run-scheduler build test migrate-up migrate-down docker-build docker-up docker-down clean
+.PHONY: run run-server run-scheduler build test swagger migrate-up migrate-down docker-build docker-up docker-down clean
 
 # Run the server
 run: run-server
@@ -17,6 +17,10 @@ build:
 # Test
 test:
 	go test ./...
+
+# Swagger
+swagger:
+	swag init -g cmd/server/main.go -o docs
 
 # Migrate (requires golang-migrate CLI)
 migrate-up:

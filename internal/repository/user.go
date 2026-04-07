@@ -10,7 +10,7 @@ import (
 
 type UserRepository interface {
 	Create(ctx context.Context, user *model.User) error
-	FindByID(ctx context.Context, id string) (*model.User, error)
+	FindByID(ctx context.Context, id int64) (*model.User, error)
 	FindByEmail(ctx context.Context, email string) (*model.User, error)
 	FindByUsername(ctx context.Context, username string) (*model.User, error)
 }
@@ -27,7 +27,7 @@ func (r *userRepo) Create(ctx context.Context, user *model.User) error {
 	return r.db.WithContext(ctx).Create(user).Error
 }
 
-func (r *userRepo) FindByID(ctx context.Context, id string) (*model.User, error) {
+func (r *userRepo) FindByID(ctx context.Context, id int64) (*model.User, error) {
 	var user model.User
 	err := r.db.WithContext(ctx).Where("id = ?", id).First(&user).Error
 	if err != nil {

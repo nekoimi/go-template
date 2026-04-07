@@ -18,6 +18,17 @@ func NewUploadHandler(fileService service.FileService) *UploadHandler {
 	return &UploadHandler{fileService: fileService}
 }
 
+// UploadSingle godoc
+// @Summary      Upload a single file
+// @Tags         upload
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        file   formData  file    true  "File to upload"
+// @Param        folder formData  string  false "Upload folder"
+// @Success      200    {object}  response.APIResponse
+// @Failure      400    {object}  response.APIResponse
+// @Router       /upload/single [post]
 func (h *UploadHandler) UploadSingle(c *gin.Context) {
 	file, err := c.FormFile("file")
 	if err != nil {
@@ -36,6 +47,17 @@ func (h *UploadHandler) UploadSingle(c *gin.Context) {
 	response.Success(c, result)
 }
 
+// UploadMultiple godoc
+// @Summary      Upload multiple files
+// @Tags         upload
+// @Accept       multipart/form-data
+// @Produce      json
+// @Security     BearerAuth
+// @Param        files  formData  []file  true  "Files to upload"
+// @Param        folder formData  string  false "Upload folder"
+// @Success      200    {object}  response.APIResponse
+// @Failure      400    {object}  response.APIResponse
+// @Router       /upload/multiple [post]
 func (h *UploadHandler) UploadMultiple(c *gin.Context) {
 	form, err := c.MultipartForm()
 	if err != nil {

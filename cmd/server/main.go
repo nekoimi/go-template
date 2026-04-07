@@ -1,5 +1,14 @@
 package main
 
+// @title           Go Template API
+// @version         1.0
+// @description     A Go backend template project.
+// @host            localhost:8080
+// @BasePath        /v1
+// @securityDefinitions.apikey BearerAuth
+// @in              header
+// @name            Authorization
+
 import (
 	"context"
 	"flag"
@@ -22,7 +31,6 @@ func main() {
 	if err != nil {
 		log.Fatalf("failed to initialize app: %v", err)
 	}
-	defer cleanup()
 
 	// Start WebSocket manager
 	go a.WSManager.Run()
@@ -30,7 +38,6 @@ func main() {
 	// Start scheduler if enabled
 	if a.Scheduler != nil {
 		a.Scheduler.Start()
-		defer a.Scheduler.Stop()
 	}
 
 	// HTTP server
@@ -53,12 +60,28 @@ func main() {
 	<-ctx.Done()
 	a.Logger.Info("shutting down server")
 
-	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	timeout := time.Duration(a.Config.Server.ShutdownTimeout) * time.Second
+	if timeout <= 0 {
+		timeout = 10 * time.Second
+	}
+	shutdownCtx, cancel := context.WithTimeout(context.Background(), timeout)
 	defer cancel()
 
+	// 1. HTTP shutdown
 	if err := srv.Shutdown(shutdownCtx); err != nil {
 		a.Logger.Error("server shutdown error", zap.Error(err))
 	}
+
+	// 2. Stop scheduler
+	if a.Scheduler != nil {
+		a.Scheduler.Stop()
+	}
+
+	// 3. Shutdown WebSocket manager
+	a.WSManager.Shutdown()
+
+	// Cleanup resources
+	cleanup()
 
 	a.Logger.Info("server stopped")
 }

@@ -4,6 +4,8 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 	"go.uber.org/zap"
 	"gorm.io/gorm"
 
@@ -22,13 +24,32 @@ func SetupRouter(cfg *config.Config, logger *zap.Logger, db *gorm.DB, fileStorag
 
 	// Middleware
 	r.Use(middleware.Recovery(logger))
+	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestLogger(logger))
 	r.Use(middleware.CORS())
 
-	// Health check
+	// Rate limiting
+	if cfg.RateLimit.Enabled {
+		r.Use(middleware.RateLimit(cfg.RateLimit.RPS, cfg.RateLimit.Burst))
+	}
+
+	// Health check (liveness)
 	r.GET("/health", func(c *gin.Context) {
 		c.JSON(200, gin.H{"status": "ok"})
 	})
+
+	// Readiness check (DB ping)
+	r.GET("/ready", func(c *gin.Context) {
+		sqlDB, err := db.DB()
+		if err != nil || sqlDB.Ping() != nil {
+			c.JSON(503, gin.H{"status": "not ready"})
+			return
+		}
+		c.JSON(200, gin.H{"status": "ready"})
+	})
+
+	// Swagger
+	r.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	// Local file serving
 	if cfg.Storage.Driver == "local" {
@@ -42,7 +63,7 @@ func SetupRouter(cfg *config.Config, logger *zap.Logger, db *gorm.DB, fileStorag
 	jwtExpire := time.Duration(cfg.JWT.ExpireHours) * time.Hour
 	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, jwtExpire)
 	userService := service.NewUserService(userRepo)
-	fileService := service.NewFileService(fileStorage)
+	fileService := service.NewFileService(fileStorage, cfg.Storage.Local.AllowedExts, cfg.Storage.Local.AllowedMIMEs)
 
 	// Handlers
 	authHandler := v1.NewAuthHandler(authService)

@@ -25,6 +25,15 @@ func RequestLogger(logger *zap.Logger) gin.HandlerFunc {
 			zap.Duration("latency", latency),
 			zap.String("ip", c.ClientIP()),
 		}
+
+		if requestID, exists := c.Get(RequestIDKey); exists {
+			fields = append(fields, zap.String("request_id", requestID.(string)))
+		}
+
+		if userID, exists := c.Get("userID"); exists {
+			fields = append(fields, zap.String("user_id", userID.(string)))
+		}
+
 		if query != "" {
 			fields = append(fields, zap.String("query", query))
 		}

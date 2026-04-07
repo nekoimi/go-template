@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"sync"
 
+	"github.com/gorilla/websocket"
 	"go.uber.org/zap"
 )
 
@@ -182,4 +183,19 @@ func (m *Manager) ClientCount() int {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	return len(m.clients)
+}
+
+// Shutdown gracefully closes all WebSocket connections.
+func (m *Manager) Shutdown() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	for userID, client := range m.clients {
+		// Send close frame
+		client.conn.WriteMessage(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, "server shutting down"))
+		close(client.send)
+		delete(m.clients, userID)
+	}
+	m.rooms = make(map[string]map[string]*Client)
+	m.logger.Info("websocket manager shutdown complete")
 }

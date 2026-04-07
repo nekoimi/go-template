@@ -11,6 +11,8 @@ import (
 	"github.com/nekoimi/go-project-template/internal/handler"
 	"github.com/nekoimi/go-project-template/internal/infrastructure/database"
 	"github.com/nekoimi/go-project-template/internal/infrastructure/logger"
+	"github.com/nekoimi/go-project-template/internal/pkg/snowflake"
+	"github.com/nekoimi/go-project-template/internal/pkg/timeutil"
 	"github.com/nekoimi/go-project-template/internal/scheduler"
 	"github.com/nekoimi/go-project-template/internal/storage"
 	"github.com/nekoimi/go-project-template/internal/storage/local"
@@ -35,7 +37,17 @@ func Initialize(configPath string) (*App, func(), error) {
 		return nil, nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
-	// 2. Logger
+	// 2. Timezone
+	if err := timeutil.SetGlobalLocation(cfg.Server.Timezone); err != nil {
+		return nil, nil, fmt.Errorf("failed to set timezone: %w", err)
+	}
+
+	// 3. Snowflake
+	if err := snowflake.Init(cfg.Snowflake.NodeID); err != nil {
+		return nil, nil, fmt.Errorf("failed to init snowflake: %w", err)
+	}
+
+	// 4. Logger
 	log, err := logger.NewLogger(cfg.Server.Mode)
 	if err != nil {
 		return nil, nil, fmt.Errorf("failed to create logger: %w", err)

@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -11,13 +12,8 @@ import (
 
 	"github.com/nekoimi/go-project-template/internal/dto"
 	"github.com/nekoimi/go-project-template/internal/model"
+	"github.com/nekoimi/go-project-template/internal/pkg/errcode"
 	"github.com/nekoimi/go-project-template/internal/repository"
-)
-
-var (
-	ErrEmailAlreadyExists    = errors.New("email already exists")
-	ErrUsernameAlreadyExists = errors.New("username already exists")
-	ErrInvalidCredentials    = errors.New("invalid email or password")
 )
 
 type AuthService interface {
@@ -42,14 +38,14 @@ func NewAuthService(userRepo repository.UserRepository, jwtSecret string, jwtExp
 func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error) {
 	// Check email
 	if _, err := s.userRepo.FindByEmail(ctx, req.Email); err == nil {
-		return nil, ErrEmailAlreadyExists
+		return nil, errcode.New(errcode.ErrEmailExists)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
 
 	// Check username
 	if _, err := s.userRepo.FindByUsername(ctx, req.Username); err == nil {
-		return nil, ErrUsernameAlreadyExists
+		return nil, errcode.New(errcode.ErrUsernameExists)
 	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
 		return nil, err
 	}
@@ -89,13 +85,13 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 	user, err := s.userRepo.FindByEmail(ctx, req.Email)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrInvalidCredentials
+			return nil, errcode.New(errcode.ErrInvalidCreds)
 		}
 		return nil, err
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return nil, ErrInvalidCredentials
+		return nil, errcode.New(errcode.ErrInvalidCreds)
 	}
 
 	token, err := s.generateToken(user.ID)
@@ -114,9 +110,9 @@ func (s *authService) Login(ctx context.Context, req dto.LoginRequest) (*dto.Aut
 	}, nil
 }
 
-func (s *authService) generateToken(userID string) (string, error) {
+func (s *authService) generateToken(userID int64) (string, error) {
 	claims := jwt.MapClaims{
-		"sub": userID,
+		"sub": fmt.Sprintf("%d", userID),
 		"exp": time.Now().Add(s.jwtExpire).Unix(),
 		"iat": time.Now().Unix(),
 	}

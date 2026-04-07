@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/google/uuid"
 	minioClient "github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
 
 	"github.com/nekoimi/go-project-template/internal/config"
+	"github.com/nekoimi/go-project-template/internal/pkg/snowflake"
 	"github.com/nekoimi/go-project-template/internal/storage"
 )
 
@@ -50,7 +50,7 @@ func New(cfg config.StorageConfig) (storage.FileStorage, error) {
 
 func (s *minioStorage) Upload(ctx context.Context, file *storage.FileHeader, folder string) (*storage.UploadResult, error) {
 	ext := filepath.Ext(file.Filename)
-	filename := uuid.New().String() + ext
+	filename := snowflake.GenerateStringID() + ext
 	objectName := fmt.Sprintf("%s/%s", strings.Trim(folder, "/"), filename)
 
 	contentType := mime.TypeByExtension(ext)

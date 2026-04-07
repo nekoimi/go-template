@@ -1,6 +1,6 @@
 package dto
 
-import "time"
+import "github.com/nekoimi/go-project-template/internal/pkg/timeutil"
 
 type RegisterRequest struct {
 	Username string `json:"username" binding:"required,min=3,max=50"`
@@ -19,8 +19,8 @@ type AuthResponse struct {
 }
 
 type UserInfo struct {
-	ID        string    `json:"id"`
-	Username  string    `json:"username"`
-	Email     string    `json:"email"`
-	CreatedAt time.Time `json:"created_at"`
+	ID        int64             `json:"id,string"`
+	Username  string            `json:"username"`
+	Email     string            `json:"email"`
+	CreatedAt timeutil.LocalTime `json:"created_at"`
 }

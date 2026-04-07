@@ -8,7 +8,7 @@ import (
 )
 
 type UserService interface {
-	GetProfile(ctx context.Context, userID string) (*dto.UserResponse, error)
+	GetProfile(ctx context.Context, userID int64) (*dto.UserResponse, error)
 }
 
 type userService struct {
@@ -19,7 +19,7 @@ func NewUserService(userRepo repository.UserRepository) UserService {
 	return &userService{userRepo: userRepo}
 }
 
-func (s *userService) GetProfile(ctx context.Context, userID string) (*dto.UserResponse, error) {
+func (s *userService) GetProfile(ctx context.Context, userID int64) (*dto.UserResponse, error) {
 	user, err := s.userRepo.FindByID(ctx, userID)
 	if err != nil {
 		return nil, err

@@ -2,6 +2,7 @@ package v1
 
 import (
 	"net/http"
+	"strconv"
 
 	"github.com/gin-gonic/gin"
 
@@ -18,15 +19,34 @@ func NewUserHandler(userService service.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
+// GetProfile godoc
+// @Summary      Get current user profile
+// @Tags         users
+// @Produce      json
+// @Security     BearerAuth
+// @Success      200  {object}  response.APIResponse{data=dto.UserResponse}
+// @Failure      401  {object}  response.APIResponse
+// @Failure      404  {object}  response.APIResponse
+// @Router       /users/profile [get]
 func (h *UserHandler) GetProfile(c *gin.Context) {
 	userID, exists := c.Get("userID")
 	if !exists {
-		response.Error(c, http.StatusUnauthorized, errcode.Unauthorized)
+		response.AppErr(c, errcode.New(errcode.Unauthorized))
 		return
 	}
 
-	profile, err := h.userService.GetProfile(c.Request.Context(), userID.(string))
+	uid, err := strconv.ParseInt(userID.(string), 10, 64)
 	if err != nil {
+		response.AppErr(c, errcode.New(errcode.Unauthorized))
+		return
+	}
+
+	profile, err := h.userService.GetProfile(c.Request.Context(), uid)
+	if err != nil {
+		if appErr, ok := response.IsAppError(err); ok {
+			response.AppErr(c, appErr)
+			return
+		}
 		response.ErrorWithMsg(c, http.StatusInternalServerError, errcode.Internal, err.Error())
 		return
 	}

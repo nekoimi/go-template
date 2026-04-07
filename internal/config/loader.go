@@ -22,6 +22,8 @@ func Load(configPath string) (*Config, error) {
 	_ = v.BindEnv("database.password", "DATABASE_PASSWORD")
 	_ = v.BindEnv("database.dbname", "DATABASE_NAME")
 	_ = v.BindEnv("jwt.secret", "JWT_SECRET")
+	_ = v.BindEnv("server.timezone", "TZ")
+	_ = v.BindEnv("snowflake.node_id", "SNOWFLAKE_NODE_ID")
 
 	if err := v.ReadInConfig(); err != nil {
 		return nil, err
@@ -38,8 +40,10 @@ func Load(configPath string) (*Config, error) {
 func DefaultConfig() *Config {
 	return &Config{
 		Server: ServerConfig{
-			Port: "8080",
-			Mode: "debug",
+			Port:            "8080",
+			Mode:            "debug",
+			Timezone:        "Asia/Shanghai",
+			ShutdownTimeout: 10,
 		},
 		Database: DatabaseConfig{
 			Host:            "localhost",
@@ -59,6 +63,14 @@ func DefaultConfig() *Config {
 		Scheduler: SchedulerConfig{
 			Enabled:  false,
 			Timezone: "Asia/Shanghai",
+		},
+		Snowflake: SnowflakeConfig{
+			NodeID: 1,
+		},
+		RateLimit: RateLimitConfig{
+			Enabled: false,
+			RPS:     100,
+			Burst:   200,
 		},
 		Websocket: WebsocketConfig{
 			Enabled:         false,

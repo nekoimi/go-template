@@ -3,6 +3,7 @@ package middleware
 import (
 	"net/http"
 	"sync"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"golang.org/x/time/rate"
@@ -25,23 +26,49 @@ func RateLimit(rps float64, burst int) gin.HandlerFunc {
 	}
 }
 
-// IPRateLimit 基于 IP 的令牌桶限流
+type limiterEntry struct {
+	limiter    *rate.Limiter
+	lastAccess time.Time
+}
+
+// IPRateLimit 基于 IP 的令牌桶限流（带过期清理）
 func IPRateLimit(rps float64, burst int) gin.HandlerFunc {
 	var mu sync.Mutex
-	limiters := make(map[string]*rate.Limiter)
+	limiters := make(map[string]*limiterEntry)
+
+	// 定期清理过期的 limiter
+	go func() {
+		ticker := time.NewTicker(5 * time.Minute)
+		defer ticker.Stop()
+		for range ticker.C {
+			mu.Lock()
+			cutoff := time.Now().Add(-10 * time.Minute)
+			for ip, entry := range limiters {
+				if entry.lastAccess.Before(cutoff) {
+					delete(limiters, ip)
+				}
+			}
+			mu.Unlock()
+		}
+	}()
 
 	return func(c *gin.Context) {
 		ip := c.ClientIP()
 
 		mu.Lock()
-		limiter, exists := limiters[ip]
+		entry, exists := limiters[ip]
 		if !exists {
-			limiter = rate.NewLimiter(rate.Limit(rps), burst)
-			limiters[ip] = limiter
+			entry = &limiterEntry{
+				limiter:    rate.NewLimiter(rate.Limit(rps), burst),
+				lastAccess: time.Now(),
+			}
+			limiters[ip] = entry
+		} else {
+			entry.lastAccess = time.Now()
 		}
 		mu.Unlock()
 
-		if !limiter.Allow() {
+		if !entry.limiter.Allow() {
 			response.Error(c, http.StatusTooManyRequests, errcode.TooManyReq)
 			c.Abort()
 			return

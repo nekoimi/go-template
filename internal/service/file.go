@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
+	"mime"
 	"mime/multipart"
 	"net/http"
 	"path/filepath"
@@ -49,7 +50,7 @@ func (s *fileService) validateFile(fileHeader *multipart.FileHeader) error {
 	if err != nil {
 		return fmt.Errorf("failed to open file for validation: %w", err)
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 
 	buf := make([]byte, 512)
 	n, err := f.Read(buf)
@@ -58,8 +59,13 @@ func (s *fileService) validateFile(fileHeader *multipart.FileHeader) error {
 	}
 
 	detectedMIME := http.DetectContentType(buf[:n])
-	if len(s.allowedMIMEs) > 0 && !s.allowedMIMEs[detectedMIME] {
-		return fmt.Errorf("file MIME type %q not allowed", detectedMIME)
+	mediaType, _, err := mime.ParseMediaType(detectedMIME)
+	if err != nil {
+		mediaType = detectedMIME
+	}
+	mediaType = strings.ToLower(strings.TrimSpace(mediaType))
+	if len(s.allowedMIMEs) > 0 && !s.allowedMIMEs[mediaType] {
+		return fmt.Errorf("file MIME type %q not allowed", mediaType)
 	}
 
 	return nil
@@ -74,7 +80,7 @@ func (s *fileService) UploadSingle(ctx context.Context, fileHeader *multipart.Fi
 	if err != nil {
 		return nil, fmt.Errorf("failed to open file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	fh := &storage.FileHeader{
 		File:     file,

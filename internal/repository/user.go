@@ -13,6 +13,7 @@ type UserRepository interface {
 	FindByID(ctx context.Context, id int64) (*model.User, error)
 	FindByEmail(ctx context.Context, email string) (*model.User, error)
 	FindByUsername(ctx context.Context, username string) (*model.User, error)
+	WithTx(tx *gorm.DB) UserRepository
 }
 
 type userRepo struct {
@@ -21,6 +22,10 @@ type userRepo struct {
 
 func NewUserRepository(db *gorm.DB) UserRepository {
 	return &userRepo{db: db}
+}
+
+func (r *userRepo) WithTx(tx *gorm.DB) UserRepository {
+	return &userRepo{db: tx}
 }
 
 func (r *userRepo) Create(ctx context.Context, user *model.User) error {

@@ -26,7 +26,7 @@ func SetupRouter(cfg *config.Config, logger *zap.Logger, db *gorm.DB, fileStorag
 	r.Use(middleware.Recovery(logger))
 	r.Use(middleware.RequestID())
 	r.Use(middleware.RequestLogger(logger))
-	r.Use(middleware.CORS())
+	r.Use(middleware.CORS(cfg.Server.AllowedOrigins))
 
 	// Rate limiting
 	if cfg.RateLimit.Enabled {
@@ -61,7 +61,7 @@ func SetupRouter(cfg *config.Config, logger *zap.Logger, db *gorm.DB, fileStorag
 
 	// Services
 	jwtExpire := time.Duration(cfg.JWT.ExpireHours) * time.Hour
-	authService := service.NewAuthService(userRepo, cfg.JWT.Secret, jwtExpire)
+	authService := service.NewAuthService(userRepo, db, cfg.JWT.Secret, jwtExpire)
 	userService := service.NewUserService(userRepo)
 	fileService := service.NewFileService(fileStorage, cfg.Storage.Local.AllowedExts, cfg.Storage.Local.AllowedMIMEs)
 
@@ -69,7 +69,7 @@ func SetupRouter(cfg *config.Config, logger *zap.Logger, db *gorm.DB, fileStorag
 	authHandler := v1.NewAuthHandler(authService)
 	userHandler := v1.NewUserHandler(userService)
 	uploadHandler := v1.NewUploadHandler(fileService)
-	wsHandler := v1.NewWSHandler(ws.NewWSHandler(wsManager, cfg.JWT.Secret, logger))
+	wsHandler := v1.NewWSHandler(ws.NewWSHandler(wsManager, cfg.JWT.Secret, logger, cfg.Server.AllowedOrigins))
 
 	// API v1 routes
 	api := r.Group("/v1")

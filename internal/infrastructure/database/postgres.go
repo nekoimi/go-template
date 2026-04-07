@@ -12,15 +12,16 @@ import (
 	"github.com/nekoimi/go-project-template/internal/config"
 )
 
-func NewPostgresDB(cfg config.DatabaseConfig, log *zap.Logger) (*gorm.DB, error) {
+func NewPostgresDB(cfg config.DatabaseConfig, log *zap.Logger, serverMode string) (*gorm.DB, error) {
 	dsn := fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
 		cfg.Host, cfg.Port, cfg.User, cfg.Password, cfg.DBName, cfg.SSLMode,
 	)
 
 	var gormLogLevel logger.LogLevel
-	switch cfg.SSLMode {
-	// 根据实际需求调整，这里默认用 Info
+	switch serverMode {
+	case "release":
+		gormLogLevel = logger.Warn
 	default:
 		gormLogLevel = logger.Info
 	}

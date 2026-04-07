@@ -23,33 +23,21 @@ type AuthService interface {
 
 type authService struct {
 	userRepo  repository.UserRepository
+	db        *gorm.DB
 	jwtSecret string
 	jwtExpire time.Duration
 }
 
-func NewAuthService(userRepo repository.UserRepository, jwtSecret string, jwtExpire time.Duration) AuthService {
+func NewAuthService(userRepo repository.UserRepository, db *gorm.DB, jwtSecret string, jwtExpire time.Duration) AuthService {
 	return &authService{
 		userRepo:  userRepo,
+		db:        db,
 		jwtSecret: jwtSecret,
 		jwtExpire: jwtExpire,
 	}
 }
 
 func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*dto.AuthResponse, error) {
-	// Check email
-	if _, err := s.userRepo.FindByEmail(ctx, req.Email); err == nil {
-		return nil, errcode.New(errcode.ErrEmailExists)
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
-	// Check username
-	if _, err := s.userRepo.FindByUsername(ctx, req.Username); err == nil {
-		return nil, errcode.New(errcode.ErrUsernameExists)
-	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
-		return nil, err
-	}
-
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return nil, err
@@ -61,7 +49,25 @@ func (s *authService) Register(ctx context.Context, req dto.RegisterRequest) (*d
 		Password: string(hashed),
 	}
 
-	if err := s.userRepo.Create(ctx, user); err != nil {
+	// 使用事务包裹唯一性检查和创建，防止并发竞态
+	err = s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
+		txRepo := s.userRepo.WithTx(tx)
+
+		if _, err := txRepo.FindByEmail(ctx, req.Email); err == nil {
+			return errcode.New(errcode.ErrEmailExists)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		if _, err := txRepo.FindByUsername(ctx, req.Username); err == nil {
+			return errcode.New(errcode.ErrUsernameExists)
+		} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+			return err
+		}
+
+		return txRepo.Create(ctx, user)
+	})
+	if err != nil {
 		return nil, err
 	}
 

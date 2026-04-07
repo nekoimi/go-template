@@ -2,12 +2,11 @@ package middleware
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 
 	"github.com/nekoimi/go-project-template/internal/pkg/errcode"
+	"github.com/nekoimi/go-project-template/internal/pkg/jwtutil"
 	"github.com/nekoimi/go-project-template/internal/pkg/response"
 )
 
@@ -20,35 +19,15 @@ func JWTAuth(secret string) gin.HandlerFunc {
 			return
 		}
 
-		parts := strings.SplitN(authHeader, " ", 2)
+		parts := splitN(authHeader, " ", 2)
 		if len(parts) != 2 || parts[0] != "Bearer" {
 			response.Error(c, http.StatusUnauthorized, errcode.Unauthorized)
 			c.Abort()
 			return
 		}
 
-		tokenStr := parts[1]
-		token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-			if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-				return nil, jwt.ErrSignatureInvalid
-			}
-			return []byte(secret), nil
-		})
-		if err != nil || !token.Valid {
-			response.Error(c, http.StatusUnauthorized, errcode.Unauthorized)
-			c.Abort()
-			return
-		}
-
-		claims, ok := token.Claims.(jwt.MapClaims)
-		if !ok {
-			response.Error(c, http.StatusUnauthorized, errcode.Unauthorized)
-			c.Abort()
-			return
-		}
-
-		userID, ok := claims["sub"].(string)
-		if !ok {
+		userID, err := jwtutil.ValidateToken(parts[1], secret)
+		if err != nil {
 			response.Error(c, http.StatusUnauthorized, errcode.Unauthorized)
 			c.Abort()
 			return
@@ -57,4 +36,35 @@ func JWTAuth(secret string) gin.HandlerFunc {
 		c.Set("userID", userID)
 		c.Next()
 	}
+}
+
+// splitN 按分隔符分割字符串，最多返回 n 部分
+func splitN(s, sep string, n int) []string {
+	if n <= 0 {
+		return nil
+	}
+	if sep == "" {
+		return []string{s}
+	}
+
+	var parts []string
+	for i := 0; i < n-1; i++ {
+		idx := index(s, sep)
+		if idx == -1 {
+			break
+		}
+		parts = append(parts, s[:idx])
+		s = s[idx+len(sep):]
+	}
+	parts = append(parts, s)
+	return parts
+}
+
+func index(s, substr string) int {
+	for i := 0; i <= len(s)-len(substr); i++ {
+		if s[i:i+len(substr)] == substr {
+			return i
+		}
+	}
+	return -1
 }

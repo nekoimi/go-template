@@ -24,10 +24,11 @@ type RateLimitConfig struct {
 }
 
 type ServerConfig struct {
-	Port            string `mapstructure:"port"`
-	Mode            string `mapstructure:"mode"` // debug / release
-	Timezone        string `mapstructure:"timezone"`
-	ShutdownTimeout int    `mapstructure:"shutdown_timeout"` // 秒
+	Port            string   `mapstructure:"port"`
+	Mode            string   `mapstructure:"mode"` // debug / release
+	Timezone        string   `mapstructure:"timezone"`
+	ShutdownTimeout int      `mapstructure:"shutdown_timeout"` // 秒
+	AllowedOrigins  []string `mapstructure:"allowed_origins"`  // CORS/WebSocket 允许的来源，空则允许全部
 }
 
 type DatabaseConfig struct {

@@ -54,7 +54,7 @@ func Initialize(configPath string) (*App, func(), error) {
 	}
 
 	// 3. Database
-	db, err := database.NewPostgresDB(cfg.Database, log)
+	db, err := database.NewPostgresDB(cfg.Database, log, cfg.Server.Mode)
 	if err != nil {
 		log.Fatal("failed to connect database", zap.Error(err))
 	}

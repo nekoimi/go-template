@@ -2,33 +2,27 @@ package websocket
 
 import (
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/golang-jwt/jwt/v5"
 	wslib "github.com/gorilla/websocket"
 	"go.uber.org/zap"
+
+	"github.com/nekoimi/go-project-template/internal/pkg/jwtutil"
 )
 
-var upgrader = wslib.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin: func(r *http.Request) bool {
-		return true // TODO: restrict in production
-	},
-}
-
 type WSHandler struct {
-	manager   *Manager
-	jwtSecret string
-	logger    *zap.Logger
+	manager       *Manager
+	jwtSecret     string
+	logger        *zap.Logger
+	allowedOrigins []string
 }
 
-func NewWSHandler(manager *Manager, jwtSecret string, logger *zap.Logger) *WSHandler {
+func NewWSHandler(manager *Manager, jwtSecret string, logger *zap.Logger, allowedOrigins []string) *WSHandler {
 	return &WSHandler{
-		manager:   manager,
-		jwtSecret: jwtSecret,
-		logger:    logger,
+		manager:       manager,
+		jwtSecret:     jwtSecret,
+		logger:        logger,
+		allowedOrigins: allowedOrigins,
 	}
 }
 
@@ -41,10 +35,18 @@ func (h *WSHandler) Upgrade(c *gin.Context) {
 		return
 	}
 
-	userID, err := h.validateToken(tokenStr)
+	userID, err := jwtutil.ValidateToken(tokenStr, h.jwtSecret)
 	if err != nil {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "invalid token"})
 		return
+	}
+
+	upgrader := wslib.Upgrader{
+		ReadBufferSize:  1024,
+		WriteBufferSize: 1024,
+		CheckOrigin: func(r *http.Request) bool {
+			return h.checkOrigin(r.Header.Get("Origin"))
+		},
 	}
 
 	conn, err := upgrader.Upgrade(c.Writer, c.Request, nil)
@@ -60,33 +62,16 @@ func (h *WSHandler) Upgrade(c *gin.Context) {
 	go client.ReadPump()
 }
 
-func (h *WSHandler) validateToken(tokenStr string) (string, error) {
-	token, err := jwt.Parse(tokenStr, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, jwt.ErrSignatureInvalid
-		}
-		return []byte(h.jwtSecret), nil
-	})
-	if err != nil {
-		return "", err
+func (h *WSHandler) checkOrigin(origin string) bool {
+	// 如果未配置允许的来源，则允许所有（开发模式）
+	if len(h.allowedOrigins) == 0 {
+		return true
 	}
-
-	claims, ok := token.Claims.(jwt.MapClaims)
-	if !ok || !token.Valid {
-		return "", jwt.ErrTokenInvalidClaims
-	}
-
-	// Check expiration
-	if exp, ok := claims["exp"].(float64); ok {
-		if time.Now().Unix() > int64(exp) {
-			return "", jwt.ErrTokenExpired
+	// 检查来源是否在允许列表中
+	for _, allowed := range h.allowedOrigins {
+		if origin == allowed {
+			return true
 		}
 	}
-
-	userID, ok := claims["sub"].(string)
-	if !ok {
-		return "", jwt.ErrTokenInvalidClaims
-	}
-
-	return userID, nil
+	return false
 }
